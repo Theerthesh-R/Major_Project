@@ -1,0 +1,72 @@
+-- 1. Students table
+CREATE TABLE students (
+    student_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    roll_number VARCHAR(20) NOT NULL UNIQUE,
+    class VARCHAR(20),
+    email VARCHAR(100),
+    phone VARCHAR(15),
+    registered_on DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Subjects table
+CREATE TABLE subjects (
+    subject_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    faculty_id INT
+    -- You can add FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id)
+    -- if you create a faculty table separately
+);
+
+-- 3. Attendance table
+CREATE TABLE attendance (
+    attendance_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    subject_id INT NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    subject_name VARCHAR(100),
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (subject_id) REFERENCES subjects(subject_id) ON DELETE CASCADE
+);
+
+-- 4. Face embeddings table
+CREATE TABLE face_embeddings (
+    embedding_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT,
+    name VARCHAR(100),
+    embedding TEXT NOT NULL,
+    created_on DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+);
+
+-- 5. Timetable table
+CREATE TABLE timetable (
+    timetable_id INT AUTO_INCREMENT PRIMARY KEY,
+    subject_id INT NOT NULL,
+    day VARCHAR(20) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    FOREIGN KEY (subject_id) REFERENCES subjects(subject_id) ON DELETE CASCADE
+);
+
+-- 6. Student timetable mapping table
+CREATE TABLE student_timetable (
+    student_timetable_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    timetable_id INT NOT NULL,
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (timetable_id) REFERENCES timetable(timetable_id) ON DELETE CASCADE
+);
+
+-- 7. Users table (for login)
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL,
+    role ENUM('student','faculty','admin') NOT NULL,
+    student_id INT,
+    faculty_id INT,
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    -- If you later add a faculty table:
+    -- FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+);

@@ -1,0 +1,25 @@
+# Python virtual environment
+faceenv/
+
+# Python compiled/shared files
+*.so
+*.h5
+
+# Node modules
+node_modules/
+
+# Bytecode
+*.pyc
+__pycache__/
+
+# Dataset / images
+dataset/
+cropped/
+embeddings/
+
+# Logs
+*.log
+
+# Optional editor files
+.vscode/
+.idea/
