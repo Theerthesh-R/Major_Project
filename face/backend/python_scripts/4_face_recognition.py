@@ -15,6 +15,7 @@ import threading
 class RTSPStream:
     def __init__(self, url):
         self.cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        #self.cap = cv2.VideoCapture(0)
         self.ret, self.frame = self.cap.read()
         self.lock = threading.Lock()
         self.running = True
@@ -35,7 +36,6 @@ class RTSPStream:
         self.running = False
         self.cap.release()
 
-
 # --------------------------
 # GPU / CUDA setup
 # --------------------------
@@ -45,9 +45,9 @@ print(f"Using device: {device}")
 # --------------------------
 # Config
 # --------------------------
-USE_COSINE = False
-THRESHOLD = 1.0
-FRAMES_REQUIRED = 10
+USE_COSINE = True      # True = cosine similarity; False = Euclidean distance
+THRESHOLD = 0.85       # Confidence threshold for recognition
+FRAMES_REQUIRED = 10   # frames before marking attendance
 
 # --------------------------
 # Face Detection + Embedding
@@ -62,7 +62,7 @@ conn = mysql.connector.connect(
     host="localhost",
     user="root",
     password="password",
-    database="final_db_for_project"
+    database="majorproject"
 )
 cursor = conn.cursor()
 
@@ -147,6 +147,7 @@ while True:
 
                 emb = embeddings[i]
                 name = "Unknown"
+                confidence_score = 0.0
 
                 if USE_COSINE:
                     max_sim, best_match = -1, None
@@ -154,6 +155,7 @@ while True:
                         sim = cosine_similarity(emb, known_emb)
                         if sim > max_sim:
                             max_sim, best_match = sim, names[j]
+                    confidence_score = max_sim
                     if max_sim >= THRESHOLD:
                         name = best_match
                 else:
@@ -162,28 +164,46 @@ while True:
                         dist = np.linalg.norm(emb - known_emb)
                         if dist < min_dist:
                             min_dist, best_match = dist, names[j]
-                    if min_dist <= THRESHOLD:
+                    # Convert distance to confidence score (0-1 scale)
+                    # Assuming typical Euclidean distances are between 0-2 for face recognition
+                    confidence_score = max(0, 1 - (min_dist / 2.0))
+                    if confidence_score >= THRESHOLD:
                         name = best_match
 
-                # Draw box & label
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(frame, name, (x1, y1-10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                # Determine color based on confidence
+                if confidence_score >= THRESHOLD:
+                    color = (0, 255, 0)  # Green for recognized
+                else:
+                    color = (0, 0, 255)  # Red for unknown/low confidence
 
-                # Attendance logic
-                if name != "Unknown":
+                # Draw box & label + confidence
+                label = f"{name} ({confidence_score:.2f})"
+                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                cv2.putText(frame, label, (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+                # Attendance logic - only mark if confidence is above threshold
+                if name != "Unknown" and confidence_score >= THRESHOLD:
                     detection_counts[name] = detection_counts.get(name, 0) + 1
                     if detection_counts[name] >= FRAMES_REQUIRED and name not in already_marked:
                         mark_attendance(name)
                         detection_counts[name] = 0
                 else:
-                    detection_counts["Unknown"] = 0
+                    # Reset counter for unknown or low confidence detections
+                    if name in detection_counts:
+                        detection_counts[name] = 0
 
-    # Show FPS
+    # Show FPS and threshold info
     now = time.time()
     fps = 1 / (now - fps_time)
     fps_time = now
+    
+    # Display FPS and threshold information
     cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+    cv2.putText(frame, f"Threshold: {THRESHOLD}", (10, 60),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+    cv2.putText(frame, f"Method: {'Cosine' if USE_COSINE else 'Euclidean'}", (10, 90),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
     cv2.imshow("Recognition - Dahua RTSP", frame)

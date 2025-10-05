@@ -14,6 +14,8 @@ save_dir = os.path.join("dataset", name)
 os.makedirs(save_dir, exist_ok=True)
 
 cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+# cap = cv2.VideoCapture(0)
+
 if not cap.isOpened():
     print("❌ Cannot connect to camera stream")
     sys.exit(1)

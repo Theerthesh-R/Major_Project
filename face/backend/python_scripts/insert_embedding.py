@@ -28,7 +28,7 @@ conn = mysql.connector.connect(
     host="localhost",
     user="root",
     password="password",
-    database="final_db_for_project"
+    database="majorproject"
 )
 cursor = conn.cursor()
 

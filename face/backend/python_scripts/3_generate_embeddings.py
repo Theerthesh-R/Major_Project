@@ -29,33 +29,44 @@ def get_embedding(img_bgr):
     # Resize to 160x160 (FaceNet default)
     img_rgb = cv2.resize(img_rgb, (160, 160))
 
-    # Convert to tensor [C,H,W], normalize to 0–1
+    # Convert to tensor [C,H,W], normalize to ~[-1,1]
     img_tensor = torch.tensor(img_rgb, dtype=torch.float32).permute(2, 0, 1).unsqueeze(0)
-    img_tensor = (img_tensor - 127.5) / 128.0  # normalize roughly like FaceNet training
+    img_tensor = (img_tensor - 127.5) / 128.0
     img_tensor = img_tensor.to(device)
 
     with torch.no_grad():
         embedding = embedder(img_tensor)  # [1,512]
     return embedding.squeeze(0).cpu().numpy()
 
-# ── Process all cropped faces ───────────────────────────────────
+# ── Process all cropped faces per person ────────────────────────
 for person in os.listdir(cropped_path):
     person_folder = os.path.join(cropped_path, person)
     if not os.path.isdir(person_folder):
         continue
 
+    print(f"🔹 Processing person: {person}")
+    embeddings = []  # collect all embeddings for this person
+
     for img_name in os.listdir(person_folder):
         if img_name.lower().endswith(".jpg"):
             img_path = os.path.join(person_folder, img_name)
-            print(f"📸 Processing: {img_path}")
             img = cv2.imread(img_path)
             if img is None:
                 print(f"⚠️ Could not read {img_path}")
                 continue
 
-            embedding = get_embedding(img)
-            out_file = os.path.join(output_path, f"{person}_{os.path.splitext(img_name)[0]}.npy")
-            np.save(out_file, embedding)
-            print(f"💾 Saved embedding: {out_file}")
+            emb = get_embedding(img)
+            embeddings.append(emb)
 
-print("✅ All embeddings saved individually!")
+    if not embeddings:
+        print(f"⚠️ No valid images found for {person}, skipping.")
+        continue
+
+    # Average all embeddings → single 512-d vector
+    mean_embedding = np.mean(embeddings, axis=0)
+
+    out_file = os.path.join(output_path, f"{person}.npy")
+    np.save(out_file, mean_embedding)
+    print(f"💾 Saved combined embedding: {out_file}")
+
+print("✅ All combined embeddings saved successfully!")
