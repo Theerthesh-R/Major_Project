@@ -14,8 +14,8 @@ import threading
 # --------------------------
 class RTSPStream:
     def __init__(self, url):
-        self.cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
-        #self.cap = cv2.VideoCapture(0)
+        #self.cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        self.cap = cv2.VideoCapture(0)
         self.ret, self.frame = self.cap.read()
         self.lock = threading.Lock()
         self.running = True
@@ -99,6 +99,14 @@ def mark_attendance(name):
 # --------------------------
 def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+
+
+
+
+
+
+
 
 # --------------------------
 # Initialize RTSP stream with threading
