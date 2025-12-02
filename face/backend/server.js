@@ -254,11 +254,69 @@ app.get('/attendance', async (req, res) => {
   }
 });
 
+// ================== AUTO ATTENDANCE (For Face Recognition Service) ==================
+// This endpoint doesn't require authentication for the face recognition service
+app.post("/faculty/attendance-auto", async (req, res) => {
+  try {
+    const { student_id, subject_id, subject_name } = req.body;
+    
+    console.log("📥 Auto-attendance request received:", { student_id, subject_id, subject_name });
+    
+    if (!student_id || !subject_id || !subject_name) {
+      return res.status(400).json({ 
+        error: "All fields required: student_id, subject_id, subject_name" 
+      });
+    }
+
+    // Check if student exists
+    const [studentRows] = await db.promise().query(
+      "SELECT student_id, name FROM students WHERE student_id = ?",
+      [student_id]
+    );
+
+    if (studentRows.length === 0) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    const studentName = studentRows[0].name;
+
+    // Check if attendance already exists for today
+    const today = new Date().toISOString().split('T')[0];
+    const [existing] = await db.promise().query(
+      'SELECT * FROM attendance WHERE student_id = ? AND DATE(timestamp) = ? AND subject_id = ?',
+      [student_id, today, subject_id]
+    );
+    
+    if (existing.length > 0) {
+      console.log(`⚠️ Attendance already marked for ${studentName} in ${subject_name} today`);
+      return res.status(400).json({ 
+        error: 'Attendance already marked for this subject today',
+        student_name: studentName
+      });
+    }
+    
+    // Insert new attendance record
+    await db.promise().query(
+      'INSERT INTO attendance (student_id, subject_id, subject_name, timestamp) VALUES (?, ?, ?, NOW())',
+      [student_id, subject_id, subject_name]
+    );
+    
+    console.log(`✅ Auto-attendance marked: ${studentName} (ID: ${student_id}) for ${subject_name}`);
+    
+    res.json({ 
+      message: `Attendance marked successfully for ${studentName} in ${subject_name}`,
+      student_name: studentName,
+      timestamp: new Date().toLocaleString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Auto-attendance error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 
 // ---------------- STUDENT ROUTES ----------------
-// Get student attendance (student)
-// ---------------- STUDENT ROUTES ----------------
-// Get student attendance (student)
 // Get student attendance (student)
 app.get("/student/attendance", authenticateToken, (req, res) => {
     if (req.user.role !== "student") {

@@ -258,7 +258,8 @@ resnet = InceptionResnetV1(pretrained="vggface2").eval().to(device)
 class RTSPStream:
     def __init__(self, url):
         # try FFMPEG backend first, fallback to default, then to camera 0
-        self.cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        # self.cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        self.cap = cv2.VideoCapture(0)
         if not self.cap.isOpened():
             self.cap = cv2.VideoCapture(url)
             if not self.cap.isOpened():

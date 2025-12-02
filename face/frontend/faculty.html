@@ -66,6 +66,79 @@
 
   h2 { margin-top: 0; color: #333; }
   .action-btn { cursor: pointer; border: none; background: none; font-size: 16px; }
+  
+  /* Face Recognition Section Styles */
+  .face-recognition-section {
+    text-align: center;
+    padding: 30px;
+  }
+  
+  .face-recognition-btn {
+    background: #28a745;
+    border: none;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    margin: 10px;
+    transition: 0.2s;
+  }
+  
+  .face-recognition-btn:hover {
+    background: #218838;
+    transform: translateY(-2px);
+  }
+  
+  .log-box {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    text-align: left;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 14px;
+  }
+
+  /* New styles for service control */
+  .control-buttons {
+    margin: 20px 0;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .start-btn {
+    background: #28a745 !important;
+  }
+
+  .stop-btn {
+    background: #dc3545 !important;
+  }
+
+  .clear-btn {
+    background: #6c757d !important;
+  }
+
+  .status-info {
+    background: #e9ecef;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    text-align: center;
+  }
+
+  #serviceStatus, #currentSubject {
+    font-weight: bold;
+    margin: 5px 0;
+    font-size: 16px;
+  }
 </style>
 </head>
 <body>
@@ -80,6 +153,7 @@
   <button onclick="showSection('assigned')">👨‍🏫 Assigned Students</button>
   <button onclick="showSection('attendance')">🗂 Attendance</button>
   <button onclick="showSection('timetable')">📅 Timetable</button>
+  <button onclick="showSection('faceRecognition')">👁️ Face Recognition</button>
 </nav>
 
 <!-- Students Section -->
@@ -130,16 +204,57 @@
   </table>
 </section>
 
+<!-- Face Recognition Section -->
+<section id="faceRecognition">
+  <div class="face-recognition-section">
+    <h2>👁️ Face Recognition System</h2>
+    <p>Start the face recognition service to automatically mark attendance for detected students.</p>
+    
+    <div class="control-buttons">
+      <button class="face-recognition-btn start-btn" onclick="runFaceRecognition()">
+        ▶️ Start Recognition
+      </button>
+      
+      <button class="face-recognition-btn stop-btn" onclick="stopFaceRecognition()">
+        ⏹️ Stop Recognition
+      </button>
+      
+      <button class="face-recognition-btn clear-btn" onclick="clearLog()">
+        🗑️ Clear Log
+      </button>
+    </div>
+    
+    <div class="status-info">
+      <h3>Service Status</h3>
+      <div id="serviceStatus">🔴 Not Running</div>
+      <div id="currentSubject">📚 Subject: -</div>
+    </div>
+    
+    <div class="log-box" id="faceRecognitionLog">
+      Face recognition service log will appear here...
+      \n\nClick 'Start Recognition' to begin.
+    </div>
+  </div>
+</section>
 
 <script>
   function showSection(sectionId) {
     document.querySelectorAll("section").forEach(sec => sec.classList.remove("active"));
     document.getElementById(sectionId).classList.add("active");
+    
+    // Start polling if we're on the face recognition section
+    if (sectionId === 'faceRecognition') {
+      startStatusPolling();
+    } else {
+      stopStatusPolling();
+    }
   }
 
   // Default open Students tab
   showSection('students');
 </script>
+
+  
 
 <script>
 const token = localStorage.getItem("token");
@@ -149,6 +264,129 @@ if (!token) location.href="pipeline.html";
 function logout(){
   localStorage.removeItem("token");
   location.href="pipeline.html";
+}
+
+// ---------- Face Recognition Service Functions ----------
+let recognitionInterval;
+
+async function runFaceRecognition() {
+    const log = document.getElementById("faceRecognitionLog");
+    const statusDiv = document.getElementById("serviceStatus");
+    
+    log.innerText = "⏳ Starting face recognition service...";
+    statusDiv.innerText = "🟡 Starting...";
+    statusDiv.style.color = "#ffc107";
+    
+    try {
+        const res = await fetch("http://localhost:5000/start", {
+            method: "POST"
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            log.innerText = `✅ ${data.message}\n\nService started successfully!\n\nWaiting for status updates...`;
+            statusDiv.innerText = "🟢 Running";
+            statusDiv.style.color = "#28a745";
+            startStatusPolling();
+        } else {
+            log.innerText = `❌ Error: ${data.error || 'Failed to start service'}`;
+            statusDiv.innerText = "🔴 Error";
+            statusDiv.style.color = "#dc3545";
+        }
+    } catch (err) { 
+        log.innerText = `❌ Connection failed: ${err}\n\nMake sure the face recognition service is running:\n1. Open terminal\n2. Run: python face_recognition_service.py\n3. Then try again.`;
+        statusDiv.innerText = "🔴 Service Not Running";
+        statusDiv.style.color = "#dc3545";
+    }
+}
+
+async function stopFaceRecognition() {
+    const log = document.getElementById("faceRecognitionLog");
+    const statusDiv = document.getElementById("serviceStatus");
+    
+    log.innerText = "⏳ Stopping face recognition service...";
+    statusDiv.innerText = "🟡 Stopping...";
+    statusDiv.style.color = "#ffc107";
+    
+    try {
+        const res = await fetch("http://localhost:5000/stop", {
+            method: "POST"
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            log.innerText = `🛑 ${data.message}\n\nService stopped successfully!`;
+            statusDiv.innerText = "🔴 Stopped";
+            statusDiv.style.color = "#dc3545";
+            stopStatusPolling();
+        } else {
+            log.innerText = `❌ Error: ${data.error || 'Failed to stop service'}`;
+            statusDiv.innerText = "🔴 Error";
+            statusDiv.style.color = "#dc3545";
+        }
+    } catch (err) { 
+        log.innerText = `❌ Connection failed: ${err}`;
+        statusDiv.innerText = "🔴 Connection Error";
+        statusDiv.style.color = "#dc3545";
+    }
+}
+
+function startStatusPolling() {
+    // Clear any existing interval
+    stopStatusPolling();
+    
+    recognitionInterval = setInterval(async () => {
+        try {
+            const res = await fetch("http://localhost:5000/status");
+            const status = await res.json();
+            
+            const log = document.getElementById("faceRecognitionLog");
+            const statusDiv = document.getElementById("serviceStatus");
+            const subjectDiv = document.getElementById("currentSubject");
+            
+            // Update status
+            if (status.is_running) {
+                statusDiv.innerText = "🟢 Running";
+                statusDiv.style.color = "#28a745";
+            } else {
+                statusDiv.innerText = "🔴 Stopped";
+                statusDiv.style.color = "#dc3545";
+            }
+            
+            // Update subject
+            if (status.current_subject) {
+                subjectDiv.innerText = `📚 Subject: ${status.current_subject.subject_name}`;
+            }
+            
+            // Update log
+            let logText = `🟢 Status: ${status.status}\n`;
+            logText += `📚 Current Subject: ${status.current_subject?.subject_name || 'Unknown'}\n\n`;
+            logText += `📋 Recent Attendance:\n${status.attendance_log?.join('\n') || 'No attendance marked yet'}`;
+            
+            log.innerText = logText;
+            
+        } catch (err) {
+            console.error("Status polling error:", err);
+            const statusDiv = document.getElementById("serviceStatus");
+            statusDiv.innerText = "🔴 Service Offline";
+            statusDiv.style.color = "#dc3545";
+        }
+    }, 3000); // Update every 3 seconds
+}
+
+function stopStatusPolling() {
+    if (recognitionInterval) {
+        clearInterval(recognitionInterval);
+        recognitionInterval = null;
+    }
+}
+
+function clearLog() {
+    document.getElementById("faceRecognitionLog").innerText = "Face recognition service log will appear here...\n\nClick 'Start Recognition' to begin.";
+    document.getElementById("serviceStatus").innerText = "🔴 Not Running";
+    document.getElementById("serviceStatus").style.color = "#dc3545";
+    document.getElementById("currentSubject").innerText = "📚 Subject: -";
+    stopStatusPolling();
 }
 
 // ---------- Fetch Students ----------
@@ -226,7 +464,6 @@ async function unassignStudent(studentId){
   if(res.ok){ alert(data.message); fetchAssigned(); }
   else alert(data.error||data.message);
 }
-
 
 // ---------- Fetch Attendance ----------
 async function fetchAttendance(){
@@ -336,7 +573,6 @@ async function deleteAttendance(id){
 }
 
 // ---------- Fetch Timetable ----------
-// ---------- Fetch Timetable ----------
 async function fetchTimetable(){
   const res = await fetch("http://localhost:3000/faculty/timetable", {
     headers: { "Authorization": "Bearer " + token }
@@ -360,7 +596,6 @@ async function fetchTimetable(){
   });
 }
 
-
 // ---------- Add Timetable ----------
 async function addTimetable(){
   const subject_id = prompt("Subject ID");
@@ -379,7 +614,6 @@ async function addTimetable(){
   if(res.ok){ alert(data.message); fetchTimetable(); }
   else alert(data.error||data.message);
 }
-
 
 // ---------- Edit Timetable ----------
 async function editTimetable(id, day, start_time, end_time, subject_id){
@@ -410,12 +644,11 @@ async function deleteTimetable(id){
   else alert(data.error||data.message);
 }
 
-
 // ---------- Initial Load ----------
-fetchStudents();  // already existing (all students)
-fetchAssigned();  // new function
+fetchStudents();
+fetchAssigned();
 fetchAttendance();
-fetchTimetable(); 
+fetchTimetable();
 
 </script>
 </body>
